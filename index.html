@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Budgie</title>
+  </head>
+  <body>
+    <script>    	
+    	function then(continuation){
+    		var callback = function(err){
+    			if ( err ) {
+    				if ( callback.abortion ) {
+    					console.log(callback.abortion.name);
+    					callback.abortion(err);
+    				}
+        		} else if ( continuation ) {
+    				continuation.apply(this,Array.prototype.slice.call(arguments,1));
+    			}
+    		}
+    		
+    		callback.or = function (abortion){
+    			callback.abortion = abortion;
+    			
+    			return callback;
+    		}
+    		
+    		return callback;
+    	}
+    	
+    	function stop(err){
+	    	throw err;
+	    }
+    
+	    var Datastore = require('nedb');
+	    var db = new Datastore({filename:'contacts.nedb', nodeWebkitAppName:'contacts'});
+	    
+	    var domain = require('domain').create();
+	    domain.on('error',function(err){
+	    	console.log('domain error',err);
+	    });
+	    
+	    domain.run(function(){
+			db.loadDatabase(
+				then(function loadedDatabase(){
+					db.ensureIndex(
+						{
+							fieldName: 'name',
+							unique: true
+						},
+						then(function ensuredIndex(){
+							var name = prompt('your name?');
+							
+							db.insert({'name':name},
+								then(function inserted(newDoc){
+									db.find({},
+										then(function found(docs){
+											console.log(docs);
+										})
+										.or(function notFound(err){
+											console.log(err);
+										})
+									);
+								})
+								.or(function insertFailed(err){
+									console.log(err);
+								})
+							);
+						})
+						.or(stop)
+					);
+					
+					
+				})
+				.or(function failedLoadingDatabase(err){
+					console.log(err);
+				})
+			)
+	    });
+    </script>
+  </body>
+</html>
